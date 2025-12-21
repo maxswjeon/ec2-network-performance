@@ -43,6 +43,26 @@ async def download_data(
                 await out_file.write(chunk)
 
 
+async def download_instance_types(
+    session: aiohttp.ClientSession,
+):
+    types = [
+        "gp",
+        "co",
+        "mo",
+        "so",
+        "ac",
+        "hpc",
+        "pg"
+    ]
+
+    for t in types:
+        await download_data(
+            session,
+            f"https://docs.aws.amazon.com/ec2/latest/instancetypes/{t}.html",
+            f"data/instance-types/{t}.html",
+        )
+
 async def get_instance_savings_plan_instance_types(
     session: aiohttp.ClientSession,
 ) -> list[str]:
@@ -259,6 +279,9 @@ async def main(
         print(
             f"Downloading data for {len(regions)} regions: {', '.join(sorted(regions))}"
         )
+
+        # Download instance types
+        await download_instance_types(session)
 
         # Download On-Demand data
         tasks = [

@@ -27,13 +27,13 @@ jobs:
         run: uv sync
 
       - name: Download pricing data
-        run: uv run python download.py --regions-all
+        run: uv run download.py --regions-all
 
       - name: Prepare data
-        run: uv run python prepare.py
+        run: uv run prepare.py
 
       - name: Export CSV files
-        run: uv run python export.py
+        run: uv run export.py
 
       - name: Collect and rename CSV files
         run: |
