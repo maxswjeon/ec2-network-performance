@@ -45,9 +45,12 @@ jobs:
             fi
           done
 
-      - name: Generate release tag
+      - name: Generate release tag and metadata
         id: tag
-        run: echo "tag=v$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        run: |
+          echo "tag=v$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+          echo "commit_hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -61,6 +64,7 @@ jobs:
             - Instance type pricing (On-Demand, Savings Plans, Reserved Instances)
             - Network performance specifications
 
-            Generated on: ${{ github.event.repository.updated_at || github.event.head_commit.timestamp }}
+            Generated on: ${{ steps.tag.outputs.timestamp }}
+            Commit: ${{ steps.tag.outputs.commit_hash }}
           files: dist/*.csv
           fail_on_unmatched_files: true
