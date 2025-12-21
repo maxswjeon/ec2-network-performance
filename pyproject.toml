@@ -14,6 +14,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.19.1",
     "ruff>=0.14.10",
     "types-aiofiles>=25.1.0.20251011",
+    "types-tqdm>=4.67.0.20250809",
 ]

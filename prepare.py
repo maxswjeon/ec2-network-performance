@@ -9,6 +9,11 @@ def normalize_cell_text(text: str) -> str:
 
 
 def prepare_instance_type_data(filename: str):
+    if not os.path.exists(f"data/instance-types/{filename}.html"):
+        raise FileNotFoundError(
+            f"File data/instance-types/{filename}.html does not exist."
+        )
+
     with open(f"data/instance-types/{filename}.html", "r", encoding="utf-8") as file:
         html_content = file.read()
     soup = BeautifulSoup(html_content, "html.parser")
@@ -101,20 +106,36 @@ def normalize_network_performance_table(data: dict) -> dict:
 
                 normalized_specs["Baseline Bandwidth (Gbps)"] = float(value.strip())
                 normalized_specs["Burst Bandwidth (Gbps)"] = float(value.strip())
+                continue
+
             if "ENA" == key:
                 normalized_specs["ENA Support"] = value == "Yes"
+                continue
+
             if "EFA" == key:
                 normalized_specs["EFA Support"] = value == "Yes"
+                continue
+
             if "ENA Express" == key:
                 normalized_specs["ENA Express Support"] = value == "Yes"
+                continue
+
             if "Network cards" == key:
                 normalized_specs["Network cards"] = int(value)
+                continue
+
             if "Max. network interfaces" == key:
                 normalized_specs["Max. network interfaces"] = int(value)
+                continue
+
             if "IP addresses per interface" == key:
                 normalized_specs["IP addresses per interface"] = int(value)
+                continue
+
             if "IPv6" == key:
                 normalized_specs["IPv6 Support"] = value == "Yes"
+                continue
+
         normalized_data[instance_type] = normalized_specs
     return normalized_data
 
