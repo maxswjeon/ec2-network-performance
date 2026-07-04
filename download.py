@@ -68,14 +68,16 @@ def _write_validators(destination: str, headers: Mapping[str, str]) -> None:
 
 
 async def download_data(
-    session: aiohttp.ClientSession, url: str, destination: str
+    session: aiohttp.ClientSession, url: str, destination: str, force: bool = False
 ) -> None:
     os.makedirs(os.path.dirname(destination), exist_ok=True)
 
     # Revalidate an existing copy with a conditional request so unchanged files
     # come back as 304 Not Modified (no body) instead of being re-downloaded.
+    # A forced run skips revalidation and always refetches: validators only prove
+    # the remote object is unchanged, not that the local bytes are still intact.
     headers: dict[str, str] = {}
-    if os.path.exists(destination):
+    if not force and os.path.exists(destination):
         validators = _read_validators(destination)
         if "etag" in validators:
             headers["If-None-Match"] = validators["etag"]
@@ -98,6 +100,7 @@ async def download_data(
 
 async def download_instance_types(
     session: aiohttp.ClientSession,
+    force: bool = False,
 ):
     types = [
         "gp",
@@ -114,6 +117,7 @@ async def download_instance_types(
             session,
             f"https://docs.aws.amazon.com/ec2/latest/instancetypes/{t}.html",
             f"data/instance-types/{t}.html",
+            force=force,
         )
 
 async def get_instance_savings_plan_instance_types(
@@ -162,6 +166,7 @@ async def download_on_demand_data(
         session,
         f"https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/ec2/USD/current/ec2-ondemand-without-sec-sel/{location}/Linux/index.json",
         f"data/pricing/{region}/on-demand.json",
+        force=overwrite,
     )
 
 
@@ -191,6 +196,7 @@ async def download_compute_savings_plan_data(
         session,
         f"https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/computesavingsplan/USD/current/compute-savings-plan-ec2/{term}/{payment_option}/{location}/Linux/Shared/index.json",
         f"data/pricing/{region}/compute-savings-plan/{term_short}-{payment_option_short}.json",
+        force=overwrite,
     )
 
 
@@ -221,6 +227,7 @@ async def download_instance_savings_plan_data(
         session,
         f"https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/computesavingsplan/USD/current/instance-savings-plan-ec2/{term}/{payment_option}/{instance_type}/{location}/Linux/Shared/index.json",
         f"data/pricing/{region}/instance-savings-plan/{term_short}-{payment_option_short}/{instance_type}.json",
+        force=overwrite,
     )
 
 
@@ -250,6 +257,7 @@ async def download_standard_reserved_instance_data(
         session,
         f"https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/ec2/USD/current/ec2-reservedinstance/{term}/{payment_option}/{location}/Linux/Shared/index.json",
         f"data/pricing/{region}/standard-reserved-instances/{term_short}-{payment_option_short}.json",
+        force=overwrite,
     )
 
 
@@ -279,6 +287,7 @@ async def download_convertible_reserved_instance_data(
         session,
         f"https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/ec2/USD/current/ec2-reservedinstance-convertible/{term}/{payment_option}/{location}/Linux/Shared/index.json",
         f"data/pricing/{region}/convertible-reserved-instances/{term_short}-{payment_option_short}.json",
+        force=overwrite,
     )
 
 
@@ -334,7 +343,7 @@ async def main(
         )
 
         # Download instance types
-        await download_instance_types(session)
+        await download_instance_types(session, force=force)
 
         # Download On-Demand data
         tasks = [
