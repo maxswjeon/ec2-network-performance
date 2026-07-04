@@ -1,9 +1,10 @@
 import argparse
 import asyncio
 import fnmatch
+import json
 import os
 import sys
-from typing import Any, Coroutine, Literal, Union
+from typing import Any, Coroutine, Literal, Mapping, Union
 
 import aiofiles
 import aiohttp
@@ -29,18 +30,70 @@ async def gather_with_progress(
     return results
 
 
+def _meta_path(destination: str) -> str:
+    # Sidecar holding HTTP validators for `destination`. Kept out of the
+    # `.json`/isdir globs in prepare.py and export.py by using a `.meta` suffix.
+    return f"{destination}.meta"
+
+
+def _read_validators(destination: str) -> dict[str, str]:
+    meta_path = _meta_path(destination)
+    if not os.path.exists(meta_path):
+        return {}
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _write_validators(destination: str, headers: Mapping[str, str]) -> None:
+    validators: dict[str, str] = {}
+    etag = headers.get("ETag")
+    last_modified = headers.get("Last-Modified")
+    if etag:
+        validators["etag"] = etag
+    if last_modified:
+        validators["last_modified"] = last_modified
+
+    meta_path = _meta_path(destination)
+    if not validators:
+        # Server gave us nothing to revalidate with; drop any stale sidecar.
+        if os.path.exists(meta_path):
+            os.remove(meta_path)
+        return
+
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(validators, f)
+
+
 async def download_data(
     session: aiohttp.ClientSession, url: str, destination: str
 ) -> None:
     os.makedirs(os.path.dirname(destination), exist_ok=True)
 
-    async with session.get(url) as response:
+    # Revalidate an existing copy with a conditional request so unchanged files
+    # come back as 304 Not Modified (no body) instead of being re-downloaded.
+    headers: dict[str, str] = {}
+    if os.path.exists(destination):
+        validators = _read_validators(destination)
+        if "etag" in validators:
+            headers["If-None-Match"] = validators["etag"]
+        elif "last_modified" in validators:
+            headers["If-Modified-Since"] = validators["last_modified"]
+
+    async with session.get(url, headers=headers) as response:
+        if response.status == 304:
+            # Cached copy is current; leave the file and its validators as-is.
+            return
         response.raise_for_status()
         async with aiofiles.open(destination, "wb") as out_file:
             async for chunk in response.content.iter_chunked(DOWNLOAD_CHUNK_SIZE):
                 if not chunk:
                     continue
                 await out_file.write(chunk)
+
+    _write_validators(destination, response.headers)
 
 
 async def download_instance_types(
